@@ -9,6 +9,10 @@ from books.content_views import ContentView, ContentStatusView
 
 router = routers.DefaultRouter()
 router.register(r'books', views.BookViewSet)
+router.register(r'languages', views.LanguageViewSet)
+router.register(r'bookshelves', views.BookshelfViewSet)
+router.register(r'subjects', views.SubjectViewSet)
+
 
 urlpatterns = [
     re_path(r'^$', TemplateView.as_view(template_name='home.html')),

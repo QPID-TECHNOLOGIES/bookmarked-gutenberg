@@ -36,3 +36,57 @@ class JsonExceptionMiddleware:
             },
             status=500,
         )
+
+
+class ApiKeyMiddleware:
+    """Middleware to enforce API key security for mobile client requests.
+
+    Verifies that requests carry a valid API key inside the 'X-Api-Key' header
+    (or 'Authorization: Bearer <key>'). Exempts static assets and the index page
+    so the developer portal and public documentation remain visible.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        expected_key = getattr(settings, 'API_KEY', None)
+
+        # If no API_KEY env var is configured, bypass check (inactive in local dev unless set)
+        if not expected_key:
+            return self.get_response(request)
+
+        # Exempt homepage, static assets, and admin paths
+        path = request.path
+        if path == '/' or path.startswith('/static/') or path.startswith('/admin/'):
+            return self.get_response(request)
+
+        # Look for API key in X-Api-Key header
+        provided_key = request.headers.get('X-Api-Key')
+
+        # Fallback check for Authorization: Bearer <key> or Authorization: <key>
+        if not provided_key:
+            auth_header = request.headers.get('Authorization', '')
+            if auth_header.startswith('Bearer '):
+                provided_key = auth_header[7:]
+            elif auth_header.startswith('Api-Key '):
+                provided_key = auth_header[8:]
+            elif auth_header:
+                provided_key = auth_header
+
+        if not provided_key or provided_key != expected_key:
+            logger.warning(
+                'Unauthorized access attempt to %s from IP %s',
+                path,
+                request.META.get('REMOTE_ADDR'),
+            )
+            return JsonResponse(
+                {
+                    'error': 'Unauthorized',
+                    'message': 'Missing or invalid API key. Set X-Api-Key in request headers.',
+                },
+                status=401,
+            )
+
+        return self.get_response(request)
+

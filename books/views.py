@@ -99,3 +99,24 @@ class BookViewSet(viewsets.ModelViewSet):
             )
 
         return queryset.distinct()
+
+
+class LanguageViewSet(viewsets.ReadOnlyModelViewSet):
+    """Exposes all available languages for UI filter dropdowns."""
+    queryset = Language.objects.all().order_by('code')
+    serializer_class = LanguageSerializer
+    pagination_class = None  # Typically <100 languages, no paging needed
+
+
+class BookshelfViewSet(viewsets.ReadOnlyModelViewSet):
+    """Exposes all bookshelves for navigation categories."""
+    queryset = Bookshelf.objects.all().order_by('name')
+    serializer_class = BookshelfSerializer
+    pagination_class = None
+
+
+class SubjectViewSet(viewsets.ReadOnlyModelViewSet):
+    """Exposes all subjects for topic exploration."""
+    queryset = Subject.objects.all().order_by('name')
+    serializer_class = SubjectSerializer
+

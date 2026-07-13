@@ -43,6 +43,8 @@ SECRET_KEY = env('SECRET_KEY')
 DEBUG = env('DEBUG')
 
 ALLOWED_HOSTS = env('ALLOWED_HOSTS')
+API_KEY = env('API_KEY', default=None)
+
 
 
 # Application definition
@@ -66,6 +68,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'gutendex.middleware.JsonExceptionMiddleware',
+    'gutendex.middleware.ApiKeyMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
