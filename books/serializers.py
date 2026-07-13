@@ -1,6 +1,12 @@
 from rest_framework import serializers
 
 from .models import *
+from books.data_preprocessor import (
+    clean_title,
+    clean_author_name,
+    clean_subject,
+    get_full_language_name,
+)
 
 
 class BookshelfSerializer(serializers.ModelSerializer):
@@ -22,9 +28,14 @@ class LanguageSerializer(serializers.ModelSerializer):
 
 
 class PersonSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+
     class Meta:
         model = Person
         fields = ('name', 'birth_year', 'death_year')
+
+    def get_name(self, person):
+        return clean_author_name(person.name)
 
 
 class SubjectSerializer(serializers.ModelSerializer):
@@ -41,6 +52,7 @@ class SummarySerializer(serializers.ModelSerializer):
 
 class BookSerializer(serializers.ModelSerializer):
     id = serializers.SerializerMethodField()
+    title = serializers.SerializerMethodField()
     authors = PersonSerializer(many=True)
     editors = PersonSerializer(many=True)
     bookshelves = serializers.SerializerMethodField()
@@ -81,15 +93,22 @@ class BookSerializer(serializers.ModelSerializer):
     def get_id(self, book):
         return book.gutenberg_id
 
+    def get_title(self, book):
+        return clean_title(book.title)
+
     def get_languages(self, book):
-        languages = [language.code for language in book.languages.all()]
-        languages.sort()
-        return languages
+        langs = [get_full_language_name(lang.code) for lang in book.languages.all()]
+        langs.sort()
+        return langs
 
     def get_subjects(self, book):
-        subjects = [subject.name for subject in book.subjects.all()]
-        subjects.sort()
-        return subjects
+        cleaned = [clean_subject(subject.name) for subject in book.subjects.all()]
+        # Filter out empty strings/None
+        cleaned = [c for c in cleaned if c]
+        # Remove duplicates
+        cleaned = list(set(cleaned))
+        cleaned.sort()
+        return cleaned
 
     def get_summaries(self, book):
         summaries = [summary.text for summary in book.get_summaries()]

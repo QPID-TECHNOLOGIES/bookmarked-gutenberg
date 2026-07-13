@@ -155,7 +155,7 @@
             "title": "Frankenstein; or, the modern prometheus",
             "authors": [
               {
-                "name": "Shelley, Mary Wollstonecraft",
+                "name": "Mary Wollstonecraft Shelley",
                 "birth_year": 1797,
                 "death_year": 1851
               }
@@ -163,17 +163,17 @@
             "translators": [],
             "editors": [],
             "subjects": [
-              "Frankenstein's monster (Fictitious character) -- Fiction",
+              "Frankenstein's monster (Fictitious character)",
               "Horror tales",
               "Monster fiction",
               "Science fiction",
-              "Scientists -- Fiction"
+              "Scientists"
             ],
             "bookshelves": [
               "Precursors of Science Fiction",
               "Science Fiction by Women"
             ],
-            "languages": ["en"],
+            "languages": ["English"],
             "copyright": false,
             "media_type": "Text",
             "formats": {
@@ -184,7 +184,7 @@
           }
         ]
       },
-      "notes": "Optimized using prefetch_related for relationship joins, dropping server response times to ~90ms."
+      "notes": "Optimized using prefetch_related for relationship joins, dropping server response times to ~90ms. Title, authors, languages, and subjects are auto-cleaned for direct user presentation."
     },
     {
       "name": "Individual Book Details",
@@ -198,12 +198,12 @@
       "success_response_sample": {
         "id": 84,
         "title": "Frankenstein; or, the modern prometheus",
-        "authors": [{"name": "Shelley, Mary Wollstonecraft", "birth_year": 1797, "death_year": 1851}],
+        "authors": [{"name": "Mary Wollstonecraft Shelley", "birth_year": 1797, "death_year": 1851}],
         "translators": [],
         "editors": [],
         "subjects": ["Horror tales", "Science fiction"],
         "bookshelves": ["Science Fiction by Women"],
-        "languages": ["en"],
+        "languages": ["English"],
         "copyright": false,
         "media_type": "Text",
         "formats": {
