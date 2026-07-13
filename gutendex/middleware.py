@@ -56,9 +56,9 @@ class ApiKeyMiddleware:
         if not expected_key:
             return self.get_response(request)
 
-        # Exempt homepage, static assets, and admin paths
+        # Exempt homepage, static assets, admin, and health check paths
         path = request.path
-        if path == '/' or path.startswith('/static/') or path.startswith('/admin/'):
+        if path == '/' or path.startswith('/static/') or path.startswith('/admin/') or path == '/health/':
             return self.get_response(request)
 
         # Look for API key in X-Api-Key header
