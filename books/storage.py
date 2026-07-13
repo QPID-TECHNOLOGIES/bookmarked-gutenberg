@@ -90,3 +90,36 @@ def delete_file_from_s3(key):
     client = _get_s3_client()
     client.delete_object(Bucket=settings.S3_BUCKET_NAME, Key=key)
     logger.info('Deleted %s from S3', key)
+
+
+def get_presigned_download_url(key, expires_in=3600):
+    """Generate a secure presigned URL to share an S3 object.
+
+    Allows clients to download the cached book securely without requiring
+    public read bucket permissions.
+
+    Args:
+        key: The S3 object key.
+        expires_in: Time in seconds for the link to remain valid (default: 1 hr).
+
+    Returns:
+        str: Presigned URL string.
+    """
+    client = _get_s3_client()
+    try:
+        url = client.generate_presigned_url(
+            'get_object',
+            Params={
+                'Bucket': settings.S3_BUCKET_NAME,
+                'Key': key
+            },
+            ExpiresIn=expires_in
+        )
+        return url
+    except Exception as e:
+        logger.error('Failed to generate presigned URL for %s: %s', key, e)
+        # Fallback to direct URL if presigned URL generation fails
+        if settings.S3_ENDPOINT_URL:
+            return f'{settings.S3_ENDPOINT_URL.rstrip("/")}/{settings.S3_BUCKET_NAME}/{key}'
+        return f'https://{settings.S3_BUCKET_NAME}.s3.amazonaws.com/{key}'
+

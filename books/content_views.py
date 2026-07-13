@@ -18,6 +18,8 @@ from django.shortcuts import get_object_or_404, redirect
 from django.views import View
 
 from .models import Book, CachedContent, Format
+from .storage import get_presigned_download_url
+from .content_fetcher import get_s3_key
 
 logger = logging.getLogger(__name__)
 
@@ -79,9 +81,11 @@ class ContentView(View):
             defaults={'status': CachedContent.Status.PENDING},
         )
 
-        if cached.status == CachedContent.Status.READY and cached.storage_url:
-            # Cache hit — redirect to S3
-            return redirect(cached.storage_url)
+        if cached.status == CachedContent.Status.READY:
+            # Cache hit — generate a secure presigned download link and redirect to S3
+            s3_key = get_s3_key(book.gutenberg_id, cached.format_mime_type)
+            presigned_url = get_presigned_download_url(s3_key)
+            return redirect(presigned_url)
 
         if cached.status == CachedContent.Status.FAILED:
             # Previous attempt failed — reset to pending for retry
@@ -144,7 +148,9 @@ class ContentStatusView(View):
         }
 
         if cached.status == CachedContent.Status.READY:
-            response_data['url'] = cached.storage_url
+            # Generate temporary secure link for downloads
+            s3_key = get_s3_key(book.gutenberg_id, cached.format_mime_type)
+            response_data['url'] = get_presigned_download_url(s3_key)
             if cached.file_size_bytes:
                 response_data['file_size_bytes'] = cached.file_size_bytes
 
