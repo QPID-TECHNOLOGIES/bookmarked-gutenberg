@@ -1,4 +1,6 @@
 from django.db.models import Q
+from django.http import JsonResponse
+from django.views import View
 
 from rest_framework import exceptions as drf_exceptions, viewsets
 
@@ -11,8 +13,9 @@ class BookViewSet(viewsets.ModelViewSet):
 
     lookup_field = 'gutenberg_id'
 
-    queryset = Book.objects.exclude(download_count__isnull=True)
-    queryset = queryset.exclude(title__isnull=True)
+    queryset = Book.objects.exclude(download_count__isnull=True).exclude(title__isnull=True).prefetch_related(
+        'authors', 'editors', 'translators', 'languages', 'bookshelves', 'subjects'
+    )
 
     serializer_class = BookSerializer
 
@@ -119,4 +122,26 @@ class SubjectViewSet(viewsets.ReadOnlyModelViewSet):
     """Exposes all subjects for topic exploration."""
     queryset = Subject.objects.all().order_by('name')
     serializer_class = SubjectSerializer
+
+
+class SearchSuggestView(View):
+    """Exposes rapid search suggestions for search-as-you-type input.
+
+    Returns the top 10 matching books sorted by download popularity.
+    """
+
+    def get(self, request):
+        query = request.GET.get('q', '').strip()
+        if len(query) < 2:
+            return JsonResponse([], safe=False)
+
+        # Uses database values query for extremely light response footprint
+        suggestions = list(
+            Book.objects.filter(title__icontains=query)
+            .order_by('-download_count')
+            .values('gutenberg_id', 'title')[:10]
+        )
+
+        return JsonResponse(suggestions, safe=False)
+
 

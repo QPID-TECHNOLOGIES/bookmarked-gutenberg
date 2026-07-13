@@ -6,6 +6,7 @@ from rest_framework import routers
 from books import views
 from books.content_views import ContentView, ContentStatusView
 from books.health_views import HealthCheckView
+from books.views import SearchSuggestView
 
 
 router = routers.DefaultRouter()
@@ -23,6 +24,11 @@ urlpatterns = [
 
     # API Version 1 Namespace
     re_path(
+        r'^api/v1/search/suggest/$',
+        SearchSuggestView.as_view(),
+        name='v1-search-suggest',
+    ),
+    re_path(
         r'^api/v1/content/(?P<gutenberg_id>\d+)/status/$',
         ContentStatusView.as_view(),
         name='v1-content-status',
@@ -35,6 +41,11 @@ urlpatterns = [
     re_path(r'^api/v1/', include(router.urls)),
 
     # Legacy Fallback Namespace (Backwards compatibility for existing mobile builds)
+    re_path(
+        r'^search/suggest/$',
+        SearchSuggestView.as_view(),
+        name='legacy-search-suggest',
+    ),
     re_path(
         r'^content/(?P<gutenberg_id>\d+)/status/$',
         ContentStatusView.as_view(),
