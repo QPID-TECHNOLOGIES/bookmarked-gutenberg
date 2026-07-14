@@ -1,1 +1,1 @@
-web: gunicorn gutendex.wsgi --log-file -
+web: gunicorn bookmarked.wsgi --log-file -

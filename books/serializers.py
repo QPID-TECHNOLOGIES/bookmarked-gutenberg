@@ -1,13 +1,13 @@
 from rest_framework import serializers
 
 from .models import *
-from books.data_preprocessor import (
+from books.services.preprocessor import (
     clean_title,
     clean_author_name,
     clean_subject,
     get_full_language_name,
 )
-from books.storage import get_presigned_download_url
+from books.services.storage import get_presigned_download_url
 
 
 class BookshelfSerializer(serializers.ModelSerializer):
@@ -99,7 +99,7 @@ class BookSerializer(serializers.ModelSerializer):
                     url = get_presigned_download_url(s3_key)
                 else:
                     # Gutenberg mirror URL — trigger background caching
-                    from books.cover_cacher import cache_cover_in_background
+                    from books.services.cover import cache_cover_in_background
                     cache_cover_in_background(book.gutenberg_id, f.url, f.id)
             formats_dict[f.mime_type] = url
         return formats_dict
@@ -130,7 +130,7 @@ class BookSerializer(serializers.ModelSerializer):
             author = book.authors.first()
             author_name = author.name if author else ''
             # Trigger background description lookup from Open Library API
-            from books.summary_enricher import enrich_summary_in_background
+            from books.services.summary import enrich_summary_in_background
             enrich_summary_in_background(book.gutenberg_id, clean_title(book.title), author_name)
         summaries.sort()
         return summaries

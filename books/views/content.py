@@ -19,9 +19,9 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.views import View
 
-from .models import Book, CachedContent, Format
-from .storage import get_presigned_download_url
-from .content_fetcher import get_s3_key
+from books.models import Book, CachedContent, Format
+from books.services.storage import get_presigned_download_url
+from books.services.cacher import get_s3_key
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +33,12 @@ def _async_fetch_task(cached_content_id):
     """
     close_old_connections()
     try:
-        from books.content_fetcher import (
+        from books.services.cacher import (
             fetch_from_mirrors,
             try_direct_url,
             ContentFetchError,
         )
-        from books.storage import upload_file_to_s3
+        from books.services.storage import upload_file_to_s3
         from django.utils import timezone
 
         cached_content = CachedContent.objects.get(id=cached_content_id)

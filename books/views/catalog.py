@@ -4,8 +4,8 @@ from django.views import View
 
 from rest_framework import exceptions as drf_exceptions, viewsets
 
-from .models import *
-from .serializers import *
+from books.models import *
+from books.serializers import *
 
 
 class BookViewSet(viewsets.ModelViewSet):

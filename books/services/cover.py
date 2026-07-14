@@ -14,7 +14,7 @@ def _async_cache_cover(book_id, original_url, format_id):
     close_old_connections()
     try:
         from books.models import Format
-        from books.storage import upload_file_to_s3
+        from books.services.storage import upload_file_to_s3
         from urllib.parse import urlparse
 
         logger.info('Background cover caching started for book %s', book_id)

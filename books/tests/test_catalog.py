@@ -3,13 +3,13 @@ from unittest.mock import patch
 
 from django.test import TestCase
 
-from books.data_preprocessor import (
+from books.services.preprocessor import (
     clean_title,
     clean_author_name,
     clean_subject,
     get_full_language_name,
 )
-from books.summary_enricher import fetch_open_library_summary
+from books.services.summary import fetch_open_library_summary
 from books.models import Book, Summary
 
 

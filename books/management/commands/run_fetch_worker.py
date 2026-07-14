@@ -22,14 +22,14 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from books.content_fetcher import (
+from books.services.cacher import (
     ContentFetchError,
     fetch_from_mirrors,
     get_s3_key,
     try_direct_url,
 )
 from books.models import Book, CachedContent, Format
-from books.storage import upload_file_to_s3
+from books.services.storage import upload_file_to_s3
 
 logger = logging.getLogger(__name__)
 

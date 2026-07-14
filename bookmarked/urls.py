@@ -3,10 +3,10 @@ from django.views.generic import TemplateView
 
 from rest_framework import routers
 
-from books import views
-from books.content_views import ContentView, ContentStatusView
-from books.health_views import HealthCheckView
-from books.views import SearchSuggestView
+from books.views import catalog as views
+from books.views.content import ContentView, ContentStatusView
+from books.views.health import HealthCheckView
+from books.views.catalog import SearchSuggestView
 
 
 router = routers.DefaultRouter()

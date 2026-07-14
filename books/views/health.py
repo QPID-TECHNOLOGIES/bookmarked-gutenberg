@@ -4,7 +4,7 @@ from django.db import connection
 from django.http import JsonResponse
 from django.views import View
 
-from books.storage import _get_s3_client
+from books.services.storage import _get_s3_client
 
 logger = logging.getLogger(__name__)
 

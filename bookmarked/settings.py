@@ -67,9 +67,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'gutendex.middleware.JsonExceptionMiddleware',
+    'bookmarked.middleware.JsonExceptionMiddleware',
     'django.middleware.gzip.GZipMiddleware',
-    'gutendex.middleware.ApiKeyMiddleware',
+    'bookmarked.middleware.ApiKeyMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -81,12 +81,12 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'gutendex.urls'
+ROOT_URLCONF = 'bookmarked.urls'
 
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'gutendex/templates')],
+        'DIRS': [os.path.join(BASE_DIR, 'bookmarked/templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -99,7 +99,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'gutendex.wsgi.application'
+WSGI_APPLICATION = 'bookmarked.wsgi.application'
 
 
 # Database
