@@ -7,6 +7,7 @@ from books.data_preprocessor import (
     clean_subject,
     get_full_language_name,
 )
+from books.storage import get_presigned_download_url
 
 
 class BookshelfSerializer(serializers.ModelSerializer):
@@ -88,7 +89,20 @@ class BookSerializer(serializers.ModelSerializer):
         return bookshelves
 
     def get_formats(self, book):
-        return {f.mime_type: f.url for f in book.get_formats()}
+        formats_dict = {}
+        for f in book.get_formats():
+            url = f.url
+            if f.mime_type == 'image/jpeg':
+                if 's3.amazonaws.com' in url or 'bucketeer' in url:
+                    # Generate secure presigned URL for private S3 cover image
+                    s3_key = f'covers/{book.gutenberg_id}_cover.jpg'
+                    url = get_presigned_download_url(s3_key)
+                else:
+                    # Gutenberg mirror URL — trigger background caching
+                    from books.cover_cacher import cache_cover_in_background
+                    cache_cover_in_background(book.gutenberg_id, f.url, f.id)
+            formats_dict[f.mime_type] = url
+        return formats_dict
 
     def get_id(self, book):
         return book.gutenberg_id
@@ -112,5 +126,11 @@ class BookSerializer(serializers.ModelSerializer):
 
     def get_summaries(self, book):
         summaries = [summary.text for summary in book.get_summaries()]
+        if not summaries:
+            author = book.authors.first()
+            author_name = author.name if author else ''
+            # Trigger background description lookup from Open Library API
+            from books.summary_enricher import enrich_summary_in_background
+            enrich_summary_in_background(book.gutenberg_id, clean_title(book.title), author_name)
         summaries.sort()
         return summaries

@@ -68,6 +68,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'gutendex.middleware.JsonExceptionMiddleware',
+    'django.middleware.gzip.GZipMiddleware',
     'gutendex.middleware.ApiKeyMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',

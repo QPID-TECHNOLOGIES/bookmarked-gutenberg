@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.postgres.indexes import GinIndex
 
 
 class Book(models.Model):
@@ -26,6 +27,11 @@ class Book(models.Model):
 
     def get_summaries(self):
         return Summary.objects.filter(book_id=self.id)
+
+    class Meta:
+        indexes = [
+            GinIndex(fields=['title'], name='book_title_trgm_idx', opclasses=['gin_trgm_ops']),
+        ]
 
 
 class Bookshelf(models.Model):
@@ -61,6 +67,11 @@ class Person(models.Model):
 
     def __str__(self):
         return self.name
+
+    class Meta:
+        indexes = [
+            GinIndex(fields=['name'], name='person_name_trgm_idx', opclasses=['gin_trgm_ops']),
+        ]
 
 
 class Subject(models.Model):
