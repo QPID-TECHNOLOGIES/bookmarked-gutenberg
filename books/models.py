@@ -40,6 +40,11 @@ class Bookshelf(models.Model):
     def __str__(self):
         return self.name
 
+    class Meta:
+        indexes = [
+            GinIndex(fields=['name'], name='bookshelf_name_trgm_idx', opclasses=['gin_trgm_ops']),
+        ]
+
 
 class Format(models.Model):
     book = models.ForeignKey('Book', on_delete=models.CASCADE)
@@ -80,14 +85,24 @@ class Subject(models.Model):
     def __str__(self):
         return self.name
 
+    class Meta:
+        indexes = [
+            GinIndex(fields=['name'], name='subject_name_trgm_idx', opclasses=['gin_trgm_ops']),
+        ]
+
 
 class Summary(models.Model):
-    book = models.ForeignKey('Book', on_delete=models.CASCADE)
+    book = models.ForeignKey('Book', on_delete=models.CASCADE, related_name='summaries')
     text = models.TextField()
 
     def __str__(self):
         preview_len = 24
         return f'{self.text[:preview_len]}...' if len(self.text) > preview_len else self.text
+
+    class Meta:
+        indexes = [
+            GinIndex(fields=['text'], name='summary_text_trgm_idx', opclasses=['gin_trgm_ops']),
+        ]
 
 
 class CachedContent(models.Model):

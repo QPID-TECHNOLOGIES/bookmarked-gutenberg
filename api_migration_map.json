@@ -69,21 +69,43 @@
         "q": {
           "type": "string",
           "required": true,
-          "description": "Min 2 characters search term to match against book titles."
+          "description": "Min 2 characters search term to match against book titles, author names, summary text, subjects, and bookshelves."
         }
       },
       "response_content_type": "application/json",
       "success_response_sample": [
         {
           "gutenberg_id": 1513,
-          "title": "Romeo and Juliet"
-        },
-        {
-          "gutenberg_id": 847,
-          "title": "Lays of Ancient Rome"
+          "title": "Romeo and Juliet",
+          "author": "William Shakespeare",
+          "match_field": "title",
+          "book": {
+            "id": 1513,
+            "title": "Romeo and Juliet",
+            "authors": [
+              {
+                "name": "William Shakespeare",
+                "birth_year": 1564,
+                "death_year": 1616
+              }
+            ],
+            "summaries": ["A tragic love story..."],
+            "translators": [],
+            "editors": [],
+            "subjects": ["Tragedy"],
+            "bookshelves": ["Classic Drama"],
+            "languages": ["English"],
+            "copyright": false,
+            "media_type": "Text",
+            "formats": {
+              "application/epub+zip": "https://www.gutenberg.org/ebooks/1513.epub3.images",
+              "text/html": "https://www.gutenberg.org/ebooks/1513.html.images"
+            },
+            "download_count": 12034
+          }
         }
       ],
-      "notes": "Highly optimized query fetching only values of gutenberg_id and title directly from index scans. Response latency < 15ms."
+      "notes": "Highly optimized query fetching top 10 matching books across titles, authors, summaries, subjects, and bookshelves. Prefetches related elements to ensure response latency < 25ms."
     },
     {
       "name": "Books Metadata Catalog List",

@@ -89,10 +89,14 @@ class BookViewSet(viewsets.ModelViewSet):
 
         search_string = self.request.GET.get('search')
         if search_string is not None:
-            search_terms = search_string.split(' ')
+            search_terms = [t for t in search_string.split() if t]
             for term in search_terms[:32]:
                 queryset = queryset.filter(
-                    Q(authors__name__icontains=term) | Q(title__icontains=term)
+                    Q(title__icontains=term) |
+                    Q(authors__name__icontains=term) |
+                    Q(summaries__text__icontains=term) |
+                    Q(subjects__name__icontains=term) |
+                    Q(bookshelves__name__icontains=term)
                 )
 
         topic = self.request.GET.get('topic')
@@ -135,12 +139,43 @@ class SearchSuggestView(View):
         if len(query) < 2:
             return JsonResponse([], safe=False)
 
-        # Uses database values query for extremely light response footprint
-        suggestions = list(
-            Book.objects.filter(title__icontains=query)
-            .order_by('-download_count')
-            .values('gutenberg_id', 'title')[:10]
-        )
+        # Retrieve top 10 matching books using PostgreSQL GIN indexes
+        books = Book.objects.filter(
+            Q(title__icontains=query) |
+            Q(authors__name__icontains=query) |
+            Q(summaries__text__icontains=query) |
+            Q(subjects__name__icontains=query) |
+            Q(bookshelves__name__icontains=query)
+        ).prefetch_related(
+            'authors', 'editors', 'translators', 'languages', 'bookshelves', 'subjects', 'summaries'
+        ).order_by('-download_count')[:10]
+
+        suggestions = []
+        q_lower = query.lower()
+        for book in books:
+            # Determine which field matched first (in order of priority: title, author, summary, subject, bookshelf)
+            match_field = 'title'
+            if book.title and q_lower in book.title.lower():
+                match_field = 'title'
+            elif any(author.name and q_lower in author.name.lower() for author in book.authors.all()):
+                match_field = 'author'
+            elif any(summary.text and q_lower in summary.text.lower() for summary in book.summaries.all()):
+                match_field = 'summary'
+            elif any(subj.name and q_lower in subj.name.lower() for subj in book.subjects.all()):
+                match_field = 'subject'
+            elif any(shelf.name and q_lower in shelf.name.lower() for shelf in book.bookshelves.all()):
+                match_field = 'bookshelf'
+
+            primary_author = book.authors.first()
+            author_name = primary_author.name if primary_author else None
+
+            suggestions.append({
+                'gutenberg_id': book.gutenberg_id,
+                'title': book.title,
+                'author': author_name,
+                'match_field': match_field,
+                'book': BookSerializer(book, context={'request': request}).data
+            })
 
         return JsonResponse(suggestions, safe=False)
 
