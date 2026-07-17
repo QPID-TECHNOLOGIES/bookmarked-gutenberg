@@ -7,6 +7,8 @@ from rest_framework import exceptions as drf_exceptions, viewsets
 from books.models import *
 from books.serializers import *
 
+import re
+
 def get_search_matching_book_ids(search_string):
     """Finds book IDs that match the search string by querying each field/relationship
     separately. This avoids massive PostgreSQL OR joins on multiple relations, which
@@ -15,7 +17,18 @@ def get_search_matching_book_ids(search_string):
     if not search_string:
         return None
 
-    terms = [t.strip() for t in search_string.split() if t.strip()]
+    # Split on any non-alphanumeric characters (including punctuation, hyphens, and whitespace)
+    # This automatically strips SQL injection characters and punctuation.
+    raw_terms = [t for t in re.split(r'[^\w]+', search_string) if t]
+    
+    # Filter out extremely short terms (1 character) if there are longer terms to prevent massive scans
+    if len(raw_terms) > 1:
+        terms = [t for t in raw_terms if len(t) > 1]
+        if not terms:
+            terms = raw_terms
+    else:
+        terms = raw_terms
+
     if not terms:
         return None
 
