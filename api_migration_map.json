@@ -1,43 +1,101 @@
 {
   "api_identity": {
-    "name": "Project Gutenberg Bookmarked",
-    "version": "1.0.0",
-    "production_host": "https://gutenberg-bookmarked-737fe6b6f1ee.herokuapp.com"
+    "name": "Project Gutenberg Bookmarked API",
+    "version": "1.1.0",
+    "production_host": "https://gutenberg-bookmarked-737fe6b6f1ee.herokuapp.com",
+    "notes": "Specifies full payload schemas, null handling conventions, error structures, and query parameters to ensure correct client-side mapping."
   },
   "global_security": {
-    "protocol": "HTTPS (SSL Required)",
+    "protocol": "HTTPS (SSL Required in Production)",
     "auth_method": "Header-based API Key Verification",
     "header_key": "X-Api-Key",
     "header_value": "xSGCpn-wbPBOnMGEooG9x6xnEC5Vtsj_JIys1m7fMRk",
     "alternative_auth": "Authorization: Bearer xSGCpn-wbPBOnMGEooG9x6xnEC5Vtsj_JIys1m7fMRk",
-    "error_handling": {
-      "unauthorized_http_status": 401,
-      "unauthorized_json_response": {
+    "notes": "Required for all endpoints except '/' (docs portal), '/health/', and '/static/' asset requests."
+  },
+  "global_error_handling": {
+    "401_unauthorized": {
+      "description": "Returned when the API Key is missing or invalid.",
+      "response": {
         "error": "Unauthorized",
         "message": "Missing or invalid API key. Set X-Api-Key in request headers."
       }
     },
-    "throttling": {
-      "anonymous_rate_limit": "120 requests/minute",
-      "throttle_classes": ["rest_framework.throttling.AnonRateThrottle"],
-      "unthrottled_endpoints": ["/", "/health/", "/static/*"]
+    "403_forbidden": {
+      "description": "Returned when attempting write operations (POST/PUT/DELETE) without administrative permissions.",
+      "response": {
+        "detail": "Authentication credentials were not provided."
+      }
+    },
+    "404_not_found": {
+      "description": "Returned when the requested URL path, book ID, or resource does not exist.",
+      "response": {
+        "detail": "Not found."
+      }
+    },
+    "500_internal_server_error": {
+      "description": "Caught by server-side JsonExceptionMiddleware to ensure mobile client receives structured JSON instead of HTML traceback.",
+      "response": {
+        "error": "Internal Server Error",
+        "message": "An unexpected error occurred on the server. Please check the logs or contact support.",
+        "path": "/api/v1/books/"
+      }
+    },
+    "503_service_unavailable": {
+      "description": "Heroku H12 Router Timeout (triggered if database lock or connection queue holds request > 30 seconds).",
+      "response_html": "<!DOCTYPE html><html><head><title>Application Error</title></head><body>...</body></html>"
+    }
+  },
+  "search_tokenizer_rules": {
+    "description": "To prevent timeouts and GIN index scanning overhead on punctuation or common words, queries are normalized before execution:",
+    "rules": [
+      "Splitting: Search queries are split into terms on all non-alphanumeric boundaries (whitespace, hyphens, quotes, symbols).",
+      "Punctuation Stripping: All symbols (e.g. ';', '--', SQL keywords) are discarded. A query containing only symbols (like '   ' or '--;') returns all books unfiltered (no-op).",
+      "1-Character Exclusions: If a search contains multiple terms, terms that are only 1 character long (e.g. 'l' in 'l\\'histoire') are ignored, and only longer terms are matched.",
+      "Execution Order: Terms are sorted to run non-stop-words first (longest words first), and the matching ID space is iteratively narrowed down in memory. This reduces query times from 30s to <25ms."
+    ]
+  },
+  "data_models": {
+    "Person": {
+      "name": { "type": "string", "nullable": false, "notes": "Author/Editor/Translator name cleaned of birth/death years." },
+      "birth_year": { "type": "integer", "nullable": true, "notes": "4-digit year of birth, null if unknown." },
+      "death_year": { "type": "integer", "nullable": true, "notes": "4-digit year of death, null if unknown." }
+    },
+    "Book": {
+      "id": { "type": "integer", "nullable": false, "notes": "Project Gutenberg ID." },
+      "title": { "type": "string", "nullable": true, "notes": "Cleaned book title, null if unknown." },
+      "authors": { "type": "array of Person", "nullable": false, "notes": "Will be empty list if unknown." },
+      "editors": { "type": "array of Person", "nullable": false },
+      "translators": { "type": "array of Person", "nullable": false },
+      "subjects": { "type": "array of strings", "nullable": false, "notes": "Sorted alphabetically." },
+      "bookshelves": { "type": "array of strings", "nullable": false, "notes": "Sorted alphabetically." },
+      "languages": { "type": "array of strings", "nullable": false, "notes": "Expanded language names, e.g. ['English']." },
+      "copyright": { "type": "boolean", "nullable": true, "notes": "true if copyrighted, false if public domain, null if unknown." },
+      "media_type": { "type": "string", "nullable": false, "notes": "Typically 'Text'." },
+      "formats": {
+        "type": "object",
+        "nullable": false,
+        "notes": "Map of MIME-type strings to URL strings. Cover image formats point to Amazon S3 CDN presigned URLs."
+      },
+      "download_count": { "type": "integer", "nullable": true, "notes": "Popularity ranking metric, null if unknown." },
+      "summaries": { "type": "array of strings", "nullable": false, "notes": "Short descriptions enriched from Open Library." }
     }
   },
   "endpoints": [
     {
       "name": "API Documentation Portal",
       "description": "Developer landing page, interactive dashboard, and live API request playground.",
-      "http_method": "GET",
+      "http_methods": ["GET"],
       "path": "/",
       "requires_auth": false,
       "query_parameters": {},
       "response_content_type": "text/html; charset=utf-8",
-      "notes": "Public-facing single page application."
+      "notes": "Public-facing dashboard page."
     },
     {
       "name": "System Diagnostics Health Check",
       "description": "Performs diagnostics verifying live PostgreSQL database and S3 Bucketeer storage connectivity.",
-      "http_method": "GET",
+      "http_methods": ["GET"],
       "path": "/health/",
       "requires_auth": false,
       "query_parameters": {},
@@ -56,12 +114,12 @@
           "storage": "healthy"
         }
       },
-      "notes": "Uptime monitors should query this endpoint (exempted from API Key validation)."
+      "notes": "Exempted from API Key validation so monitoring systems can poll it easily."
     },
     {
       "name": "Search Autocomplete Suggestions",
       "description": "Exposes lightweight search recommendations suitable for instant search-as-you-type inputs in the app.",
-      "http_method": "GET",
+      "http_methods": ["GET"],
       "path": "/api/v1/search/suggest/",
       "legacy_paths": ["/search/suggest/"],
       "requires_auth": true,
@@ -69,7 +127,7 @@
         "q": {
           "type": "string",
           "required": true,
-          "description": "Min 2 characters search term to match against book titles, author names, summary text, subjects, and bookshelves."
+          "description": "Min 2 characters search term. Subject to standard search tokenizer rules (stripped of punctuation/symbols)."
         }
       },
       "response_content_type": "application/json",
@@ -89,7 +147,6 @@
                 "death_year": 1616
               }
             ],
-            "summaries": ["A tragic love story..."],
             "translators": [],
             "editors": [],
             "subjects": ["Tragedy"],
@@ -99,18 +156,20 @@
             "media_type": "Text",
             "formats": {
               "application/epub+zip": "https://www.gutenberg.org/ebooks/1513.epub3.images",
-              "text/html": "https://www.gutenberg.org/ebooks/1513.html.images"
+              "text/html": "https://www.gutenberg.org/ebooks/1513.html.images",
+              "image/jpeg": "https://bucketeer-a40dd3d4-d3bf-41be-bf7d-fa03be6746d7.s3.amazonaws.com/covers/1513_cover.jpg?AWSAccessKeyId=..."
             },
-            "download_count": 12034
+            "download_count": 12034,
+            "summaries": ["A tragic love story..."]
           }
         }
       ],
-      "notes": "Highly optimized query fetching top 10 matching books across titles, authors, summaries, subjects, and bookshelves. Prefetches related elements to ensure response latency < 25ms."
+      "notes": "Returns top 10 matching books sorted by download count. match_field indicates where the query matched first: 'title', 'author', 'summary', 'subject', or 'bookshelf'."
     },
     {
       "name": "Books Metadata Catalog List",
       "description": "Retrieve catalog book details. Supports pagination, sorting, search, and criteria filtering.",
-      "http_method": "GET",
+      "http_methods": ["GET"],
       "path": "/api/v1/books/",
       "legacy_paths": ["/books/"],
       "requires_auth": true,
@@ -123,7 +182,7 @@
         "search": {
           "type": "string",
           "required": false,
-          "description": "Case-insensitive terms matching author names and book titles."
+          "description": "Case-insensitive terms matching author names, book titles, summaries, subjects, or bookshelves. Follows the search tokenizer rules (punctuation stripped, stop words sorted last)."
         },
         "languages": {
           "type": "string",
@@ -200,18 +259,20 @@
             "media_type": "Text",
             "formats": {
               "application/epub+zip": "https://www.gutenberg.org/ebooks/84.epub3.images",
-              "text/html": "https://www.gutenberg.org/ebooks/84.html.images"
+              "text/html": "https://www.gutenberg.org/ebooks/84.html.images",
+              "image/jpeg": "https://bucketeer-a40dd3d4-d3bf-41be-bf7d-fa03be6746d7.s3.amazonaws.com/covers/84_cover.jpg?AWSAccessKeyId=..."
             },
-            "download_count": 92345
+            "download_count": 92345,
+            "summaries": ["A gothic horror novel..."]
           }
         ]
       },
-      "notes": "Optimized using prefetch_related for relationship joins, dropping server response times to ~90ms. Title, authors, languages, and subjects are auto-cleaned for direct user presentation."
+      "notes": "The next and previous fields are strings containing the direct URL of the next/previous page, or null if on the first/last page."
     },
     {
       "name": "Individual Book Details",
       "description": "Fetch catalog metadata for a single specific book.",
-      "http_method": "GET",
+      "http_methods": ["GET", "PUT", "PATCH", "DELETE"],
       "path": "/api/v1/books/{gutenberg_id}/",
       "legacy_paths": ["/books/{gutenberg_id}/"],
       "requires_auth": true,
@@ -229,16 +290,21 @@
         "copyright": false,
         "media_type": "Text",
         "formats": {
-          "application/epub+zip": "https://www.gutenberg.org/ebooks/84.epub3.images"
+          "application/epub+zip": "https://www.gutenberg.org/ebooks/84.epub3.images",
+          "image/jpeg": "https://bucketeer-a40dd3d4-d3bf-41be-bf7d-fa03be6746d7.s3.amazonaws.com/covers/84_cover.jpg?AWSAccessKeyId=..."
         },
-        "download_count": 92345
+        "download_count": 92345,
+        "summaries": ["A gothic horror novel..."]
       },
-      "notes": "gutenberg_id maps to Project Gutenberg catalog book ID."
+      "failure_response_sample": {
+        "detail": "Not found."
+      },
+      "notes": "Writing/deleting requires Admin session cookies (API Key is read-only). Gutenberg ID maps to Project Gutenberg catalog book ID."
     },
     {
       "name": "Languages Lookups List",
       "description": "List all language codes present in the database to populate search filters dynamically in the mobile app.",
-      "http_method": "GET",
+      "http_methods": ["GET"],
       "path": "/api/v1/languages/",
       "legacy_paths": ["/languages/"],
       "requires_auth": true,
@@ -254,7 +320,7 @@
     {
       "name": "Bookshelves Lookups List",
       "description": "List all bookshelf names to populate category tags or list navigation filters dynamically.",
-      "http_method": "GET",
+      "http_methods": ["GET"],
       "path": "/api/v1/bookshelves/",
       "legacy_paths": ["/bookshelves/"],
       "requires_auth": true,
@@ -270,7 +336,7 @@
     {
       "name": "Subjects Lookups List",
       "description": "List all book subject descriptions for tag browsing.",
-      "http_method": "GET",
+      "http_methods": ["GET"],
       "path": "/api/v1/subjects/",
       "legacy_paths": ["/subjects/"],
       "requires_auth": true,
@@ -289,7 +355,7 @@
     {
       "name": "Request Ebook Cache Job",
       "description": "Trigger dynamic S3 caching check and Gutenberg mirror fetch. Used to download books without triggering 30s router timeouts.",
-      "http_method": "GET",
+      "http_methods": ["GET"],
       "path": "/api/v1/content/{gutenberg_id}/",
       "legacy_paths": ["/content/{gutenberg_id}/"],
       "requires_auth": true,
@@ -297,7 +363,7 @@
         "format": {
           "type": "string",
           "required": false,
-          "description": "Target format (defaults to 'epub'). Supported: 'epub', 'txt', 'plain', 'html', 'kindle'."
+          "description": "Target format (defaults to 'epub'). Supported values: 'epub', 'txt', 'plain', 'html', 'kindle'."
         }
       },
       "response_content_type": "application/json",
@@ -306,13 +372,20 @@
           "description": "Cache Hit. Automatically redirects to the secure S3 Presigned download URL."
         },
         "202": {
-          "description": "Cache Miss. Job enqueued for background worker.",
+          "description": "Cache Miss. Job enqueued for background worker. Client must begin polling status_url.",
           "sample_payload": {
             "status": "pending",
             "gutenberg_id": "84",
             "format": "application/epub+zip",
             "message": "Content is being prepared. Poll /status/ for updates.",
-            "status_url": "/content/84/status/?format=epub"
+            "status_url": "/api/v1/content/84/status/?format=epub"
+          }
+        },
+        "404": {
+          "description": "Gutenberg book ID not found.",
+          "sample_payload": {
+            "error": "Not Found",
+            "message": "Book with Gutenberg ID 999999 not found."
           }
         }
       }
@@ -320,7 +393,7 @@
     {
       "name": "Ebook Cache Job Status / Download Url",
       "description": "Poll the caching status. Returns status checks and the final S3 download URL.",
-      "http_method": "GET",
+      "http_methods": ["GET"],
       "path": "/api/v1/content/{gutenberg_id}/status/",
       "legacy_paths": ["/content/{gutenberg_id}/status/"],
       "requires_auth": true,
@@ -336,26 +409,38 @@
         "pending": {
           "status": "pending",
           "gutenberg_id": "84",
-          "format": "application/epub+zip"
+          "format": "application/epub+zip",
+          "url": null,
+          "file_size_bytes": null,
+          "completed_at": null,
+          "error": null
         },
         "fetching": {
           "status": "fetching",
           "gutenberg_id": "84",
-          "format": "application/epub+zip"
+          "format": "application/epub+zip",
+          "url": null,
+          "file_size_bytes": null,
+          "completed_at": null,
+          "error": null
         },
         "failed": {
           "status": "failed",
           "gutenberg_id": "84",
           "format": "application/epub+zip",
-          "error": "Error details, retry enqueued automatically."
+          "url": null,
+          "file_size_bytes": null,
+          "completed_at": null,
+          "error": "S3 upload failed: An error occurred (AccessControlListNotSupported)"
         },
         "ready": {
           "status": "ready",
           "gutenberg_id": "84",
           "format": "application/epub+zip",
-          "url": "https://bucketeer-a40dd3d4-d3bf-41be-bf7d-fa03be6746d7.s3.amazonaws.com/books/84/pg84.epub?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=...",
+          "url": "https://bucketeer-a40dd3d4-d3bf-41be-bf7d-fa03be6746d7.s3.amazonaws.com/books/84/pg84.epub?X-Amz-Algorithm=AWS4-HMAC-SHA256&...",
           "file_size_bytes": 356363,
-          "completed_at": "2026-07-13T15:49:51.591845"
+          "completed_at": "2026-07-13T15:49:51.591845",
+          "error": null
         }
       },
       "notes": "When state is 'ready', the 'url' field contains a secure temporary S3 Presigned URL (valid for 1 hour). Use 'file_size_bytes' to drive the mobile app's download progress percentage tracker."
