@@ -17,17 +17,32 @@ def get_search_matching_book_ids(search_string):
     if not search_string:
         return None
 
+    # Standard English stop words + common domain terms
+    STOP_WORDS = {
+        'the', 'and', 'a', 'of', 'to', 'in', 'is', 'that', 'it', 'on', 'was', 'for', 'as', 'with', 
+        'by', 'at', 'an', 'be', 'this', 'have', 'from', 'or', 'but', 'not', 'your', 'which', 'are',
+        'book', 'books', 'gutenberg', 'ebook', 'ebooks', 'project'
+    }
+
     # Split on any non-alphanumeric characters (including punctuation, hyphens, and whitespace)
     # This automatically strips SQL injection characters and punctuation.
-    raw_terms = [t for t in re.split(r'[^\w]+', search_string) if t]
+    raw_terms = [t.lower().strip() for t in re.split(r'[^\w]+', search_string) if t.strip()]
     
     # Filter out extremely short terms (1 character) if there are longer terms to prevent massive scans
     if len(raw_terms) > 1:
-        terms = [t for t in raw_terms if len(t) > 1]
-        if not terms:
-            terms = raw_terms
+        filtered_terms = [t for t in raw_terms if len(t) > 1]
+        if not filtered_terms:
+            filtered_terms = raw_terms
     else:
-        terms = raw_terms
+        filtered_terms = raw_terms
+
+    # Sort terms: non-stop-words first, sorted by length descending (longest/most specific first)
+    # Stop-words last, sorted by length descending
+    def term_priority(term):
+        is_stop = term in STOP_WORDS
+        return (1 if is_stop else 0, -len(term))
+
+    terms = sorted(list(set(filtered_terms)), key=term_priority)
 
     if not terms:
         return None
@@ -35,12 +50,21 @@ def get_search_matching_book_ids(search_string):
     final_ids = None
 
     for term in terms[:5]:  # limit the number of terms to prevent CPU abuse
-        # Query matching book IDs directly from each model to maximize GIN index usage and avoid multi-table joins.
-        q1 = Book.objects.filter(title__icontains=term).values_list('id', flat=True)
-        q2 = Person.objects.filter(name__icontains=term).values_list('book__id', flat=True)
-        q3 = Summary.objects.filter(text__icontains=term).values_list('book_id', flat=True)
-        q4 = Subject.objects.filter(name__icontains=term).values_list('book__id', flat=True)
-        q5 = Bookshelf.objects.filter(name__icontains=term).values_list('book__id', flat=True)
+        # If we already have a set of candidate IDs, restrict subsequent queries to those IDs!
+        # This is extremely fast because it avoids scanning the entire database for common words.
+        if final_ids is not None:
+            q1 = Book.objects.filter(id__in=final_ids, title__icontains=term).values_list('id', flat=True)
+            q2 = Person.objects.filter(book__id__in=final_ids, name__icontains=term).values_list('book__id', flat=True)
+            q3 = Summary.objects.filter(book_id__in=final_ids, text__icontains=term).values_list('book_id', flat=True)
+            q4 = Subject.objects.filter(book__id__in=final_ids, name__icontains=term).values_list('book__id', flat=True)
+            q5 = Bookshelf.objects.filter(book__id__in=final_ids, name__icontains=term).values_list('book__id', flat=True)
+        else:
+            # First term (most specific one): query the entire database
+            q1 = Book.objects.filter(title__icontains=term).values_list('id', flat=True)
+            q2 = Person.objects.filter(name__icontains=term).values_list('book__id', flat=True)
+            q3 = Summary.objects.filter(text__icontains=term).values_list('book_id', flat=True)
+            q4 = Subject.objects.filter(name__icontains=term).values_list('book__id', flat=True)
+            q5 = Bookshelf.objects.filter(name__icontains=term).values_list('book__id', flat=True)
 
         term_ids = set(q1) | set(q2) | set(q3) | set(q4) | set(q5)
 
